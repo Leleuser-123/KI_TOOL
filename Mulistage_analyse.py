@@ -45,7 +45,9 @@ def stage_0_hard_checks(rows: List[Dict[str, Any]], id_col: str):
     # Duplicate detection
     seen = defaultdict(list)
     for idx, row in enumerate(rows):
-        seen[row.get(id_col)].append(idx)
+        product_data = row.get("row_data", {})
+        product_id = product_data.get(id_col)
+        seen[product_id].append(idx)
 
     for product_id, indices in seen.items():
         if len(indices) > 1:
@@ -218,7 +220,7 @@ Keine Erklärtexte außerhalb des JSON.
     {{
      "product_id": "string",
      "row_index": "integer",
-     "inconsistencies":[{{"fields":["string"],"issue":"string","why":"string"}}],
+     "plausibility_issues":[{{"fields":["string"],"issue":"string","why":"string"}}],
      "severity":"low|medium|high",
      "summary":"string",
      "confidence":0-100
