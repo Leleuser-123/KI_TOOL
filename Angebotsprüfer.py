@@ -8,45 +8,89 @@ import pandas as pd
 from openai import OpenAI
 
 
-SYSTEM_PROMPT = """ 
-Du bist ein Datenprüf-Tool für Angebote/Rechnungen.
+#SYSTEM_PROMPT = """ 
+#Du bist ein Datenprüf-Tool für Angebote/Rechnungen.
+#
+#Analysiere die folgende Angebots-/Rechnungszeilen und finde Fehler/Risiken:\n"
+#- Rechenfehler (z.B. Positionen, MwSt, Summe),
+#- Inkonsistenzen/Widersprüche,
+#- Plausibilität (unrealistische Werte),
+#- Zahlungsbedingungen (Vorkasse, extrem kurz),
+#- Rechtliche Risiken (Haftung ausgeschlossen, unklare Provision etc.),
+#Antworte exakt im angegebenen JSON-Schema:
+#
+#{
+#  "doc_id": "string",
+#  "row_index": "integer",
+#  "language_issues": [{"field":"string","issue":"string","suggestion":"string"}],
+#  "inconsistencies": [{"fields":["string"],"issue":"string","why":"string"}],
+#  "plausibility_issues": [{"field":"string","value":"string","issue":"string","why":"string"}],
+#  "duplicate_issues": [{"field":"string","issue":"string","finding":"string"}],
+#  "severity": "low|medium|high",
+#  "summary": "string",
+#  "confidence": "low|medium|high"
+#}
+#
+#Gib NUR gültiges JSON zurück. Kein Markdown. Keine Erklärtexte.
+#Wenn dir Informationen fehlen: gib trotzdem JSON zurück und markiere das als Issue.\n
+#"""
 
-Analysiere die folgende Angebots-/Rechnungszeilen und finde Fehler/Risiken:\n"
-- Rechenfehler (z.B. Positionen, MwSt, Summe),
-- Inkonsistenzen/Widersprüche,
-- Plausibilität (unrealistische Werte),
-- Zahlungsbedingungen (Vorkasse, extrem kurz),
-- Rechtliche Risiken (Haftung ausgeschlossen, unklare Provision etc.),
-Antworte exakt im angegebenen JSON-Schema:
+SYSTEM_PROMPT = """
+Du bist ein deterministisches Datenprüf- und Risikoanalyse-Tool.
 
-{
-  "doc_id": "string",
-  "row_index": "integer",
-  "language_issues": [{"field":"string","issue":"string","suggestion":"string"}],
-  "inconsistencies": [{"fields":["string"],"issue":"string","why":"string"}],
-  "plausibility_issues": [{"field":"string","value":"string","issue":"string","why":"string"}],
-  "duplicate_issues": [{"field":"string","issue":"string","finding":"string"}],
-  "severity": "low|medium|high",
-  "summary": "string",
-  "confidence": "low|medium|high"
-}
+Du analysierst strukturierte Datenzeilen und identifizierst:
+- Fehler
+- Inkonsistenzen
+- Risiken
+- Unplausible Werte
 
-Gib NUR gültiges JSON zurück. Kein Markdown. Keine Erklärtexte.
-Wenn dir Informationen fehlen: gib trotzdem JSON zurück und markiere das als Issue.\n
+Du erfindest keine fehlenden Informationen.
+Du interpretierst nur die bereitgestellten Daten.
+Du korrigierst keine Inhalte, sondern meldest nur Probleme.
+
+Antworte ausschließlich im angeforderten JSON-Format.
+Gib niemals Markdown oder erklärenden Fließtext zurück.
 """
 
 def check_batch_with_llm(rows: list[dict[str, Any]], schema: dict[str, str]) -> dict[str, Any]:
-    user_promt = {
-        "task": "check_entry_rows_batch",
-        "id_col": "doc_id",
-        "schema": schema,
-        "rows": rows,
-    }
-    print(".    .    .")
-    print(user_promt)
+    user_prompt = f"""
+    TASK:
+    Analysiere die folgenden Angebots-/Rechnungszeilen.
+
+    PRÜFE AUF:
+    - Rechenfehler (z.B. Positionen, MwSt, Summe)
+    - Inkonsistenzen/Widersprüche
+    - Plausibilität (unrealistische Werte)
+    - Zahlungsbedingungen (z.B. Vorkasse, extrem kurze Fristen)
+    - Rechtliche Risiken (z.B. Haftung ausgeschlossen, unklare Provision)
+
+    Wenn Informationen fehlen, markiere dies als Issue.
+
+    ANTWORT-SCHEMA (STRICT JSON):
+
+    {{
+      "doc_id": "string",
+      "row_index": "integer",
+      "language_issues": [{{"field":"string","issue":"string","suggestion":"string"}}],
+      "inconsistencies": [{{"fields":["string"],"issue":"string","why":"string"}}],
+      "plausibility_issues": [{{"field":"string","value":"string","issue":"string","why":"string"}}],
+      "duplicate_issues": [{{"field":"string","issue":"string","finding":"string"}}],
+      "severity": "low|medium|high",
+      "summary": "string",
+      "confidence": "low|medium|high"
+    }}
+
+    DATENSCHEMA:
+    {json.dumps(schema, ensure_ascii=False)}
+
+    ZEILEN:
+    {json.dumps(rows, ensure_ascii=False)}
+
+    Gib ausschließlich gültiges JSON zurück.
+    """
 
 
-    content = run_system_calls_openai(user_input=json.dumps(user_promt, ensure_ascii=False))
+    content = run_system_calls_openai(user_input=json.dumps(user_prompt, ensure_ascii=False))
 
     try:
         return json.loads(content)
@@ -68,14 +112,14 @@ def run_system_calls_openai(user_input: str) -> str:
     #for m in models.data:
     #    print(m.id)
     
-    model = "gpt-5.2"
+    model = "gpt-4.1-mini"
 
     try:
         resp = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": user_input},
-                {"role": "user", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_input},
             ],
             temperature=0.0,
             #reasoning={"effort": "medium"}
