@@ -370,4 +370,143 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+
+
+
+
+
+#def stage_123_combined(row: Dict[str, Any], row_index: int, schema: dict) -> dict:
+#    system_prompt = """
+#Du bist ein deterministischer QA-Assistent für strukturierte Produktdaten.
+#Du analysierst ausschließlich die bereitgestellten JSON-Daten.
+#
+#WICHTIG:
+#- Du erfindest keine fehlenden Informationen.
+#- Du korrigierst keine Inhalte, sondern meldest nur Probleme.
+#- Du arbeitest zeilenweise und feldweise.
+#- Du gibst ausschließlich gültiges JSON zurück. Kein Markdown. Keine Erklärtexte außerhalb des JSON.
+#"""
+#
+#    user_prompt = f"""
+#TASK:
+#Prüfe die folgende Produktzeile in DREI Dimensionen und gib ALLES in EINEM JSON zurück.
+#
+#PRÜFKRITERIEN:
+#
+#(1) Sprachfehler (language_issues)
+#- Grammatik
+#- Groß-/Kleinschreibung
+#- falsche Pluralformen
+#- fehlerhafte Formulierungen in Textfeldern (z.B. Beschreibung)
+#- Wenn Informationen fehlen, melde ein Issue (z.B. "missing value")
+#
+#(2) Inkonsistenzen (inconsistencies)
+#- innerhalb einer Spalte
+#- zwischen mehreren Spalten
+#- Wenn Informationen fehlen, melde ein Issue
+#
+#(3) Plausibilität (plausibility_issues)
+#- unrealistische oder unlogische Werte im Produktkontext
+#- besondere Prüfung bei Unterscheidung Food vs Non-Food
+#  (z.B. MHD bei Non-Food oder fehlende Energieangaben bei Food)
+#- Wenn Informationen fehlen, melde ein Issue
+#
+#ANTWORT-SCHEMA (STRICT JSON):
+#{{
+#  "product_id": "string",
+#  "row_index": "integer",
+#  "language_issues": [{{"field":"string","issue":"string","suggestion":"string"}}],
+#  "inconsistencies": [{{"fields":["string"],"issue":"string","why":"string"}}],
+#  "plausibility_issues": [{{"fields":["string"],"issue":"string","why":"string"}}],
+#  "severity": "low|medium|high",
+#  "summary": "string",
+#  "confidence": 0-100
+#}}
+#
+#DATENSCHEMA:
+#{json.dumps(schema, ensure_ascii=False)}
+#
+#PRODUKTZEILE:
+#{json.dumps(row, ensure_ascii=False)}
+#
+#Gib ausschließlich gültiges JSON zurück.
+#"""
+#    return call_llm_json(system_prompt, user_prompt)   
+
+
+#def aggregate_results(row, row_index, hard, llm_result):
+#    language_issues = llm_result.get("language_issues", [])
+#    inconsistencies = llm_result.get("inconsistencies", [])
+#    plausibility_issues = llm_result.get("plausibility_issues", [])
+#    duplicate_issues_llm = llm_result.get("duplicate_issues", [])  # optional, falls du das drin haben willst
+#
+#    hard_duplicate = hard.get("duplicate_issues", [])
+#    hard_issues = hard.get("hard_issues", [])
+#
+#    all_duplicates = hard_duplicate + duplicate_issues_llm
+#
+#    total_issues = (
+#        len(language_issues) +
+#        len(inconsistencies) +
+#        len(plausibility_issues) +
+#        len(all_duplicates) +
+#        len(hard_issues)
+#    )
+#
+#    result = {
+#        "product_id": row.get("row_data", {}).get("Produkt_ID"),
+#        "row_index": row_index,
+#        "language_issues": language_issues,
+#        "inconsistencies": inconsistencies,
+#        "plausibility_issues": plausibility_issues,
+#        "duplicate_issues": all_duplicates,
+#        "hard_issues": hard_issues,
+#        "severity": "low",
+#        "summary": "",
+#        "confidence": 100,
+#        "total_issue": total_issues
+#    }
+#
+#    # Wenn das Modell bereits severity/summary/confidence liefert, kannst du das übernehmen:
+#    # (und fallbacken, wenn leer)
+#    if llm_result.get("severity"):
+#        result["severity"] = llm_result["severity"]
+#    if llm_result.get("summary"):
+#        result["summary"] = llm_result["summary"]
+#    if isinstance(llm_result.get("confidence"), int):
+#        result["confidence"] = llm_result["confidence"]
+#
+#    # Oder alternativ: deine Heuristik (wie vorher)
+#    if total_issues == 0:
+#        result["severity"] = "low"
+#        result["summary"] = "No issues detected."
+#        result["confidence"] = 100
+#    elif total_issues < 3:
+#        result["severity"] = "medium"
+#        result["summary"] = "Minor issues detected."
+#        result["confidence"] = 80
+#    else:
+#        result["severity"] = "high"
+#        result["summary"] = "Multiple significant issues detected."
+#        result["confidence"] = 60
+#
+#    return result 
+
+
+#def multistage_analysis(rows: List[Dict[str, Any]], id_col: str, schema: dict):
+#   hard_issues = stage_0_hard_checks(rows, id_col)
+#   final_results = []
+#
+#   for idx, row in enumerate(rows):
+#       llm_result = stage_123_combined(row, idx, schema)
+#
+#       aggregated = aggregate_results(
+#           row=row,
+#           row_index=idx,
+#           hard=hard_issues.get(idx, {}),
+#           llm_result=llm_result
+#       )
+#
+#       final_results.append(aggregated)
+#
+#   return pd.DataFrame(final_results)
